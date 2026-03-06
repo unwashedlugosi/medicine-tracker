@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Max's Medicine Tracker</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --text: #1d1d1f;
+    --text2: #6e6e73;
+    --blue: #007aff;
+    --blue-light: #e8f0fe;
+    --orange: #ff9500;
+    --orange-light: #fff3e0;
+    --red: #ff3b30;
+    --red-light: #ffeaea;
+    --border: #e5e5ea;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) 16px 100px 16px;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 20px 0 4px;
+  }
+
+  .subtitle {
+    color: var(--text2);
+    font-size: 15px;
+    margin-bottom: 20px;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .card-title {
+    font-size: 17px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title .icon {
+    font-size: 20px;
+  }
+
+  .status {
+    font-size: 13px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+
+  .status-ok {
+    background: var(--blue-light);
+    color: var(--blue);
+  }
+
+  .status-wait {
+    background: var(--orange-light);
+    color: var(--orange);
+  }
+
+  .status-due {
+    background: var(--red-light);
+    color: var(--red);
+  }
+
+  .log-btn {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s, opacity 0.2s;
+    color: white;
+  }
+
+  .log-btn:active {
+    transform: scale(0.97);
+  }
+
+  .log-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-blue { background: var(--blue); }
+  .btn-orange { background: var(--orange); }
+
+  .timer {
+    text-align: center;
+    font-size: 24px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--orange);
+    margin: 8px 0;
+  }
+
+  .timer-label {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 12px;
+  }
+
+  .last-dose {
+    font-size: 13px;
+    color: var(--text2);
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  .fever-input-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .fever-input-row input {
+    flex: 1;
+    padding: 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 18px;
+    text-align: center;
+    font-weight: 600;
+    -webkit-appearance: none;
+    background: var(--bg);
+  }
+
+  .fever-input-row input:focus {
+    outline: none;
+    border-color: var(--blue);
+  }
+
+  .fever-input-row button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 10px;
+    background: var(--blue);
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .history-section {
+    margin-top: 24px;
+  }
+
+  .history-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  .history-day {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text2);
+    margin: 16px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .history-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 15px;
+    gap: 10px;
+  }
+
+  .history-item:last-child { border-bottom: none; }
+
+  .history-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .history-icon.tylenol { background: var(--blue-light); }
+  .history-icon.antibiotic { background: var(--orange-light); }
+  .history-icon.fever { background: var(--red-light); }
+
+  .history-details {
+    flex: 1;
+  }
+
+  .history-details .name { font-weight: 500; }
+  .history-details .time { color: var(--text2); font-size: 13px; }
+
+  .history-temp {
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  .temp-high { color: var(--red); }
+  .temp-normal { color: var(--blue); }
+
+  .antibiotic-progress {
+    margin-top: 8px;
+    margin-bottom: 12px;
+  }
+
+  .progress-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--orange);
+    border-radius: 3px;
+    transition: width 0.3s;
+  }
+
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 4px;
+  }
+
+  .settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 15px;
+  }
+
+  .settings-row:last-child { border-bottom: none; }
+
+  .settings-row input {
+    width: 60px;
+    padding: 6px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    text-align: center;
+    -webkit-appearance: none;
+  }
+
+  .delete-btn {
+    background: none;
+    border: none;
+    color: var(--red);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 30px;
+    color: var(--text2);
+    font-size: 15px;
+  }
+
+  .today-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .summary-item {
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+  }
+
+  .summary-value {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .summary-label {
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Max's Meds</h1>
+<p class="subtitle" id="dateDisplay"></p>
+
+<!-- Today's Summary -->
+<div class="card">
+  <div class="today-summary">
+    <div class="summary-item">
+      <div class="summary-value" id="tylenolCount">0</div>
+      <div class="summary-label">Tylenol today</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-value" id="antibioticCount">0/2</div>
+      <div class="summary-label">Antibiotic today</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-value" id="lastTemp">--</div>
+      <div class="summary-label">Last temp</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-value" id="highTemp">--</div>
+      <div class="summary-label">High today</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tylenol Card -->
+<div class="card" id="tylenolCard">
+  <div class="card-header">
+    <div class="card-title"><span class="icon">💊</span> Tylenol</div>
+    <span class="status" id="tylenolStatus">Ready</span>
+  </div>
+  <div id="tylenolTimer" style="display:none">
+    <div class="timer" id="tylenolCountdown">0:00:00</div>
+    <div class="timer-label">until next dose</div>
+  </div>
+  <button class="log-btn btn-blue" id="tylenolBtn" onclick="logTylenol()">Log Tylenol Dose</button>
+  <div class="last-dose" id="tylenolLast"></div>
+</div>
+
+<!-- Antibiotic Card -->
+<div class="card" id="antibioticCard">
+  <div class="card-header">
+    <div class="card-title"><span class="icon">🧪</span> Antibiotic</div>
+    <span class="status" id="antibioticStatus">Ready</span>
+  </div>
+  <div class="antibiotic-progress">
+    <div class="progress-bar">
+      <div class="progress-fill" id="antibioticProgress"></div>
+    </div>
+    <div class="progress-label">
+      <span id="antibioticDayLabel">Day 1</span>
+      <span id="antibioticDaysLeft"></span>
+    </div>
+  </div>
+  <button class="log-btn btn-orange" id="antibioticBtn" onclick="logAntibiotic()">Log Antibiotic Dose</button>
+  <div class="last-dose" id="antibioticLast"></div>
+</div>
+
+<!-- Fever Card -->
+<div class="card">
+  <div class="card-header">
+    <div class="card-title"><span class="icon">🌡️</span> Temperature</div>
+  </div>
+  <div class="fever-input-row">
+    <input type="number" id="tempInput" placeholder="100.4" step="0.1" min="95" max="108" inputmode="decimal">
+    <button onclick="logTemp()">Log</button>
+  </div>
+</div>
+
+<!-- Settings Card -->
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">⚙️ Settings</div>
+  </div>
+  <div class="settings-row">
+    <span>Antibiotic course (days)</span>
+    <input type="number" id="courseDays" value="10" min="1" max="30" inputmode="numeric" onchange="saveSettings()">
+  </div>
+  <div class="settings-row">
+    <span>Antibiotic start date</span>
+    <span id="startDateDisplay"></span>
+  </div>
+</div>
+
+<!-- History -->
+<div class="history-section">
+  <div class="history-title">History</div>
+  <div id="historyList"></div>
+</div>
+
+<script>
+const FOUR_HOURS = 4 * 60 * 60 * 1000;
+const STORAGE_KEY = 'maxMeds';
+
+function loadData() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) return JSON.parse(raw);
+  return {
+    logs: [],
+    settings: {
+      courseDays: 10,
+      antibioticStartDate: '2026-03-06',
+      firstDayDoses: 1
+    }
+  };
+}
+
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function saveSettings() {
+  const data = loadData();
+  data.settings.courseDays = parseInt(document.getElementById('courseDays').value) || 10;
+  saveData(data);
+  render();
+}
+
+function todayStr() {
+  return new Date().toLocaleDateString('en-CA');
+}
+
+function formatTime(date) {
+  return new Date(date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function logTylenol() {
+  const data = loadData();
+  const lastTylenol = getLastTylenol(data);
+  if (lastTylenol) {
+    const elapsed = Date.now() - new Date(lastTylenol.timestamp).getTime();
+    if (elapsed < FOUR_HOURS) return;
+  }
+  data.logs.push({ type: 'tylenol', timestamp: new Date().toISOString(), date: todayStr() });
+  saveData(data);
+  render();
+}
+
+function logAntibiotic() {
+  const data = loadData();
+  const today = todayStr();
+  const todayDoses = data.logs.filter(l => l.type === 'antibiotic' && l.date === today).length;
+  const maxToday = getMaxAntibioticToday(data);
+  if (todayDoses >= maxToday) return;
+  data.logs.push({ type: 'antibiotic', timestamp: new Date().toISOString(), date: today });
+  saveData(data);
+  render();
+}
+
+function logTemp() {
+  const input = document.getElementById('tempInput');
+  const val = parseFloat(input.value);
+  if (!val || val < 95 || val > 108) return;
+  const data = loadData();
+  data.logs.push({ type: 'temp', timestamp: new Date().toISOString(), date: todayStr(), value: val });
+  saveData(data);
+  input.value = '';
+  render();
+}
+
+function getLastTylenol(data) {
+  const tylenols = data.logs.filter(l => l.type === 'tylenol');
+  return tylenols.length ? tylenols[tylenols.length - 1] : null;
+}
+
+function getMaxAntibioticToday(data) {
+  const today = todayStr();
+  const startDate = data.settings.antibioticStartDate;
+  if (today === startDate) return data.settings.firstDayDoses;
+  return 2;
+}
+
+function getAntibioticDay(data) {
+  const start = new Date(data.settings.antibioticStartDate + 'T12:00:00');
+  const now = new Date(todayStr() + 'T12:00:00');
+  const diff = Math.floor((now - start) / (24 * 60 * 60 * 1000));
+  return Math.max(1, diff + 1);
+}
+
+function getTotalAntibioticDoses(data) {
+  return data.logs.filter(l => l.type === 'antibiotic').length;
+}
+
+function render() {
+  const data = loadData();
+  const today = todayStr();
+
+  // Date display
+  document.getElementById('dateDisplay').textContent = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric'
+  });
+
+  // Settings
+  document.getElementById('courseDays').value = data.settings.courseDays;
+  document.getElementById('startDateDisplay').textContent = formatDate(data.settings.antibioticStartDate);
+
+  // Today's counts
+  const todayLogs = data.logs.filter(l => l.date === today);
+  const tylenolToday = todayLogs.filter(l => l.type === 'tylenol').length;
+  const antibioticToday = todayLogs.filter(l => l.type === 'antibiotic').length;
+  const maxAbToday = getMaxAntibioticToday(data);
+  const todayTemps = todayLogs.filter(l => l.type === 'temp');
+
+  document.getElementById('tylenolCount').textContent = tylenolToday;
+  document.getElementById('antibioticCount').textContent = `${antibioticToday}/${maxAbToday}`;
+
+  if (todayTemps.length) {
+    const lastT = todayTemps[todayTemps.length - 1].value;
+    const highT = Math.max(...todayTemps.map(t => t.value));
+    document.getElementById('lastTemp').textContent = lastT.toFixed(1) + '°';
+    document.getElementById('lastTemp').className = 'summary-value' + (lastT >= 100.4 ? ' temp-high' : '');
+    document.getElementById('highTemp').textContent = highT.toFixed(1) + '°';
+    document.getElementById('highTemp').className = 'summary-value' + (highT >= 100.4 ? ' temp-high' : '');
+  } else {
+    document.getElementById('lastTemp').textContent = '--';
+    document.getElementById('lastTemp').className = 'summary-value';
+    document.getElementById('highTemp').textContent = '--';
+    document.getElementById('highTemp').className = 'summary-value';
+  }
+
+  // Tylenol
+  const lastTylenol = getLastTylenol(data);
+  let tylenolReady = true;
+  if (lastTylenol) {
+    const elapsed = Date.now() - new Date(lastTylenol.timestamp).getTime();
+    const remaining = FOUR_HOURS - elapsed;
+    if (remaining > 0) {
+      tylenolReady = false;
+      document.getElementById('tylenolTimer').style.display = 'block';
+      updateCountdown(remaining);
+    } else {
+      document.getElementById('tylenolTimer').style.display = 'none';
+    }
+    document.getElementById('tylenolLast').textContent = 'Last dose: ' + formatTime(lastTylenol.timestamp);
+  } else {
+    document.getElementById('tylenolTimer').style.display = 'none';
+    document.getElementById('tylenolLast').textContent = '';
+  }
+
+  const tylenolBtn = document.getElementById('tylenolBtn');
+  const tylenolStatus = document.getElementById('tylenolStatus');
+  tylenolBtn.disabled = !tylenolReady;
+  if (tylenolReady) {
+    tylenolStatus.textContent = 'Ready';
+    tylenolStatus.className = 'status status-ok';
+  } else {
+    tylenolStatus.textContent = 'Wait';
+    tylenolStatus.className = 'status status-wait';
+  }
+
+  // Antibiotic
+  const abDay = getAntibioticDay(data);
+  const courseDays = data.settings.courseDays;
+  const courseComplete = abDay > courseDays;
+  const totalDoses = getTotalAntibioticDoses(data);
+  const expectedTotal = (data.settings.firstDayDoses) + (courseDays - 1) * 2;
+  const progress = Math.min(100, (totalDoses / expectedTotal) * 100);
+
+  document.getElementById('antibioticProgress').style.width = progress + '%';
+  document.getElementById('antibioticDayLabel').textContent = courseComplete ? 'Complete!' : `Day ${abDay} of ${courseDays}`;
+  document.getElementById('antibioticDaysLeft').textContent = courseComplete ? '' : `${courseDays - abDay} days left`;
+
+  const antibioticBtn = document.getElementById('antibioticBtn');
+  const antibioticStatus = document.getElementById('antibioticStatus');
+  const abDoneToday = antibioticToday >= maxAbToday;
+
+  if (courseComplete) {
+    antibioticBtn.disabled = true;
+    antibioticBtn.textContent = 'Course Complete';
+    antibioticStatus.textContent = 'Done';
+    antibioticStatus.className = 'status status-ok';
+  } else if (abDoneToday) {
+    antibioticBtn.disabled = true;
+    antibioticBtn.textContent = 'All doses taken today';
+    antibioticStatus.textContent = 'Done today';
+    antibioticStatus.className = 'status status-ok';
+  } else {
+    antibioticBtn.disabled = false;
+    antibioticBtn.textContent = 'Log Antibiotic Dose';
+    const remaining = maxAbToday - antibioticToday;
+    antibioticStatus.textContent = `${remaining} left today`;
+    antibioticStatus.className = 'status status-due';
+  }
+
+  const lastAb = data.logs.filter(l => l.type === 'antibiotic').slice(-1)[0];
+  document.getElementById('antibioticLast').textContent = lastAb ? 'Last dose: ' + formatTime(lastAb.timestamp) : '';
+
+  // History
+  renderHistory(data);
+}
+
+function updateCountdown(remaining) {
+  if (remaining <= 0) {
+    render();
+    return;
+  }
+  const h = Math.floor(remaining / 3600000);
+  const m = Math.floor((remaining % 3600000) / 60000);
+  const s = Math.floor((remaining % 60000) / 1000);
+  document.getElementById('tylenolCountdown').textContent =
+    `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function renderHistory(data) {
+  const container = document.getElementById('historyList');
+  if (!data.logs.length) {
+    container.innerHTML = '<div class="empty-state">No entries yet</div>';
+    return;
+  }
+
+  const byDate = {};
+  [...data.logs].reverse().forEach(log => {
+    if (!byDate[log.date]) byDate[log.date] = [];
+    byDate[log.date].push(log);
+  });
+
+  let html = '';
+  Object.entries(byDate).forEach(([date, logs]) => {
+    html += `<div class="history-day">${formatDate(date)}</div><div class="card">`;
+    logs.forEach((log, i) => {
+      const iconClass = log.type === 'temp' ? 'fever' : log.type;
+      const icon = log.type === 'tylenol' ? '💊' : log.type === 'antibiotic' ? '🧪' : '🌡️';
+      const name = log.type === 'tylenol' ? 'Tylenol' : log.type === 'antibiotic' ? 'Antibiotic' : 'Temperature';
+      const extra = log.type === 'temp'
+        ? `<span class="history-temp ${log.value >= 100.4 ? 'temp-high' : 'temp-normal'}">${log.value.toFixed(1)}°</span>`
+        : '';
+      html += `<div class="history-item">
+        <div class="history-icon ${iconClass}">${icon}</div>
+        <div class="history-details">
+          <div class="name">${name}</div>
+          <div class="time">${formatTime(log.timestamp)}</div>
+        </div>
+        ${extra}
+        <button class="delete-btn" onclick="deleteLog(${data.logs.indexOf(log)})">remove</button>
+      </div>`;
+    });
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function deleteLog(index) {
+  if (!confirm('Remove this entry?')) return;
+  const data = loadData();
+  data.logs.splice(index, 1);
+  saveData(data);
+  render();
+}
+
+// Tick the countdown every second
+setInterval(() => {
+  const data = loadData();
+  const last = getLastTylenol(data);
+  if (last) {
+    const elapsed = Date.now() - new Date(last.timestamp).getTime();
+    const remaining = FOUR_HOURS - elapsed;
+    if (remaining > 0) {
+      updateCountdown(remaining);
+    } else {
+      render();
+    }
+  }
+}, 1000);
+
+render();
+</script>
+
+</body>
+</html>
