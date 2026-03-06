@@ -298,6 +298,93 @@
     padding: 4px 8px;
   }
 
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+
+  .modal {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 20px;
+    width: 100%;
+    max-width: 400px;
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+
+  .modal h3 {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  .modal-field {
+    margin-bottom: 14px;
+  }
+
+  .modal-field label {
+    display: block;
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 4px;
+  }
+
+  .modal-field input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 16px;
+    -webkit-appearance: none;
+    background: var(--bg);
+  }
+
+  .modal-field input:focus {
+    outline: none;
+    border-color: var(--blue);
+  }
+
+  .modal-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .modal-buttons button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .modal-cancel {
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .modal-save {
+    background: var(--blue);
+    color: white;
+  }
+
+  .history-item {
+    cursor: pointer;
+  }
+
+  .history-item:active {
+    background: var(--bg);
+    border-radius: 8px;
+  }
+
   .empty-state {
     text-align: center;
     padding: 30px;
@@ -414,6 +501,29 @@
   <div class="settings-row">
     <span>Antibiotic start date</span>
     <span id="startDateDisplay"></span>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3 id="editTitle">Edit Entry</h3>
+    <div class="modal-field">
+      <label>Date</label>
+      <input type="date" id="editDate">
+    </div>
+    <div class="modal-field">
+      <label>Time</label>
+      <input type="time" id="editTime">
+    </div>
+    <div class="modal-field" id="editTempField" style="display:none">
+      <label>Temperature</label>
+      <input type="number" id="editTemp" step="0.1" min="95" max="108" inputmode="decimal">
+    </div>
+    <div class="modal-buttons">
+      <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-save" onclick="saveEdit()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -664,14 +774,15 @@ function renderHistory(data) {
       const extra = log.type === 'temp'
         ? `<span class="history-temp ${log.value >= 100.4 ? 'temp-high' : 'temp-normal'}">${log.value.toFixed(1)}°</span>`
         : '';
-      html += `<div class="history-item">
+      const logIndex = data.logs.indexOf(log);
+      html += `<div class="history-item" onclick="openEdit(${logIndex})">
         <div class="history-icon ${iconClass}">${icon}</div>
         <div class="history-details">
           <div class="name">${name}</div>
           <div class="time">${formatTime(log.timestamp)}</div>
         </div>
         ${extra}
-        <button class="delete-btn" onclick="deleteLog(${data.logs.indexOf(log)})">remove</button>
+        <button class="delete-btn" onclick="event.stopPropagation();deleteLog(${logIndex})">remove</button>
       </div>`;
     });
     html += '</div>';
@@ -685,6 +796,72 @@ function deleteLog(index) {
   const data = loadData();
   data.logs.splice(index, 1);
   saveData(data);
+  render();
+}
+
+let editingIndex = null;
+
+function openEdit(index) {
+  const data = loadData();
+  const log = data.logs[index];
+  if (!log) return;
+  editingIndex = index;
+
+  const dt = new Date(log.timestamp);
+  const name = log.type === 'tylenol' ? 'Tylenol' : log.type === 'antibiotic' ? 'Antibiotic' : 'Temperature';
+  document.getElementById('editTitle').textContent = 'Edit ' + name;
+
+  // Set date (YYYY-MM-DD)
+  const y = dt.getFullYear();
+  const mo = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  document.getElementById('editDate').value = `${y}-${mo}-${d}`;
+
+  // Set time (HH:MM)
+  const h = String(dt.getHours()).padStart(2, '0');
+  const mi = String(dt.getMinutes()).padStart(2, '0');
+  document.getElementById('editTime').value = `${h}:${mi}`;
+
+  // Temp field
+  const tempField = document.getElementById('editTempField');
+  if (log.type === 'temp') {
+    tempField.style.display = 'block';
+    document.getElementById('editTemp').value = log.value;
+  } else {
+    tempField.style.display = 'none';
+  }
+
+  document.getElementById('editModal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('editModal').style.display = 'none';
+  editingIndex = null;
+}
+
+function saveEdit() {
+  if (editingIndex === null) return;
+  const data = loadData();
+  const log = data.logs[editingIndex];
+  if (!log) { closeModal(); return; }
+
+  const dateVal = document.getElementById('editDate').value;
+  const timeVal = document.getElementById('editTime').value;
+  if (!dateVal || !timeVal) return;
+
+  const newDt = new Date(`${dateVal}T${timeVal}:00`);
+  log.timestamp = newDt.toISOString();
+  log.date = dateVal;
+
+  if (log.type === 'temp') {
+    const newTemp = parseFloat(document.getElementById('editTemp').value);
+    if (newTemp && newTemp >= 95 && newTemp <= 108) {
+      log.value = newTemp;
+    }
+  }
+
+  saveData(data);
+  closeModal();
   render();
 }
 
