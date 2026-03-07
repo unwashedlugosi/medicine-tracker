@@ -420,9 +420,13 @@
 </head>
 <body>
 
-<h1>Max's Meds</h1>
+<div style="display:flex;justify-content:space-between;align-items:center">
+  <h1>Max's Meds</h1>
+  <a href="#settings" id="settingsLink" style="font-size:24px;text-decoration:none;padding:8px;color:var(--text2)">⚙️</a>
+</div>
 <p class="subtitle" id="dateDisplay"></p>
 
+<div id="mainPage">
 <!-- Today's Summary -->
 <div class="card">
   <div class="today-summary">
@@ -499,22 +503,33 @@
 <!-- Share Button -->
 <button class="log-btn btn-blue" onclick="shareLog()" style="margin-bottom:12px">Share Log</button>
 
-<!-- Settings Card -->
-<div class="card">
-  <div class="card-header">
-    <div class="card-title">⚙️ Settings</div>
+<!-- History -->
+<div class="history-section">
+  <div class="history-title">History</div>
+  <div id="historyList"></div>
+</div>
+
+</div><!-- /mainPage -->
+
+<!-- Settings Page -->
+<div id="settingsPage" style="display:none">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+    <a href="#" onclick="navigateTo('main');return false" style="font-size:24px;text-decoration:none;color:var(--blue);line-height:1">‹</a>
+    <h2 style="font-size:22px;font-weight:700">Settings</h2>
   </div>
-  <div class="settings-row">
-    <span>Total mL prescribed</span>
-    <input type="number" id="totalMl" value="200" min="50" max="1000" step="10" inputmode="numeric" onchange="saveSettings()">
-  </div>
-  <div class="settings-row">
-    <span>mL per dose</span>
-    <input type="number" id="doseSize" value="10" min="1" max="50" inputmode="numeric" onchange="saveSettings()">
-  </div>
-  <div class="settings-row">
-    <span>Discard after</span>
-    <span id="discardDateDisplay">Mar 20</span>
+  <div class="card">
+    <div class="settings-row">
+      <span>Total mL prescribed</span>
+      <input type="number" id="totalMl" value="200" min="50" max="1000" step="10" inputmode="numeric" onchange="saveSettings()">
+    </div>
+    <div class="settings-row">
+      <span>mL per dose</span>
+      <input type="number" id="doseSize" value="10" min="1" max="50" inputmode="numeric" onchange="saveSettings()">
+    </div>
+    <div class="settings-row">
+      <span>Discard after</span>
+      <span id="discardDateDisplay">Mar 20</span>
+    </div>
   </div>
 </div>
 
@@ -539,12 +554,6 @@
       <button class="modal-save" onclick="saveEdit()">Save</button>
     </div>
   </div>
-</div>
-
-<!-- History -->
-<div class="history-section">
-  <div class="history-title">History</div>
-  <div id="historyList"></div>
 </div>
 
 <script>
@@ -1038,6 +1047,25 @@ setInterval(() => {
   }
 }, 1000);
 
+// Page navigation
+function navigateTo(page) {
+  document.getElementById('mainPage').style.display = page === 'main' ? 'block' : 'none';
+  document.getElementById('settingsPage').style.display = page === 'settings' ? 'block' : 'none';
+  document.getElementById('settingsLink').style.display = page === 'main' ? 'block' : 'none';
+  if (page === 'main') window.location.hash = '';
+}
+
+function handleHash() {
+  const hash = window.location.hash;
+  if (hash === '#settings') {
+    navigateTo('settings');
+  } else {
+    navigateTo('main');
+  }
+}
+
+window.addEventListener('hashchange', handleHash);
+handleHash();
 render();
 </script>
 
