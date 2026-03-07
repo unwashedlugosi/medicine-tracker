@@ -474,6 +474,10 @@
       <span id="antibioticVolLabel">0 mL used</span>
       <span id="antibioticVolLeft"></span>
     </div>
+    <div class="progress-label" style="margin-top:2px">
+      <span id="antibioticDayLabel"></span>
+      <span id="antibioticDaysLeft"></span>
+    </div>
   </div>
   <div id="discardWarning" style="display:none;font-size:12px;color:var(--red);text-align:center;margin-bottom:8px"></div>
   <button class="log-btn btn-orange" id="antibioticBtn" onclick="logAntibiotic()">Log 10 mL Dose</button>
@@ -714,6 +718,20 @@ function render() {
   document.getElementById('antibioticProgress').style.width = progress + '%';
   document.getElementById('antibioticVolLabel').textContent = `${usedMl} mL used`;
   document.getElementById('antibioticVolLeft').textContent = remainingMl > 0 ? `${remainingMl} mL left` : '';
+
+  // Day tracking
+  const dosesPerDay = 2;
+  const dosesLeft = Math.max(0, Math.ceil(remainingMl / data.settings.doseSize));
+  const daysLeft = Math.ceil(dosesLeft / dosesPerDay);
+  const totalDays = Math.ceil((totalMl / data.settings.doseSize) / dosesPerDay);
+  const currentDay = totalDays - daysLeft + 1;
+  if (remainingMl > 0) {
+    document.getElementById('antibioticDayLabel').textContent = `Day ${currentDay} of ${totalDays}`;
+    document.getElementById('antibioticDaysLeft').textContent = daysLeft <= 1 ? 'Last day' : `${daysLeft} days left`;
+  } else {
+    document.getElementById('antibioticDayLabel').textContent = 'Complete!';
+    document.getElementById('antibioticDaysLeft').textContent = '';
+  }
 
   // Discard warning
   const discardDate = new Date(data.settings.discardDate + 'T23:59:59');
