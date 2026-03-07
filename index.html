@@ -701,7 +701,13 @@ function render() {
   const abStatus = getAbWindowStatus(data);
 
   document.getElementById('tylenolCount').textContent = tylenolToday;
-  document.getElementById('antibioticCount').textContent = `${antibioticToday}/2`;
+  // First day started at night = only 1 dose expected today
+  const allAbLogs = data.logs.filter(l => l.type === 'antibiotic');
+  const firstAbDate = allAbLogs.length ? allAbLogs[0].date : null;
+  const isFirstDay = !firstAbDate || firstAbDate === today;
+  const hasMorningDoseAnyDay = allAbLogs.some(l => l.date === today && new Date(l.timestamp).getHours() < 12);
+  const expectedToday = (isFirstDay && !hasMorningDoseAnyDay) ? 1 : 2;
+  document.getElementById('antibioticCount').textContent = `${antibioticToday}/${expectedToday}`;
 
   if (todayTemps.length) {
     const lastT = todayTemps[todayTemps.length - 1].value;
