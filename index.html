@@ -147,7 +147,16 @@
       white 8px
     );
     color: var(--blue);
-    text-shadow: 0 0 4px white, 0 0 8px white;
+    position: relative;
+  }
+  .btn-orange-label {
+    position: relative;
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    padding: 4px 14px;
+    border-radius: 8px;
+    display: inline-block;
   }
 
   .timer {
@@ -530,7 +539,7 @@
     </div>
   </div>
   <div id="discardWarning" style="display:none;font-size:12px;color:var(--red);text-align:center;margin-bottom:8px"></div>
-  <button class="log-btn btn-orange" id="antibioticBtn" onclick="logAntibiotic()">Log 10 mL Dose</button>
+  <button class="log-btn btn-orange" id="antibioticBtn" onclick="logAntibiotic()"><span class="btn-orange-label">Log 10 mL Dose</span></button>
   <div class="last-dose" id="antibioticLast"></div>
   <div class="last-dose" id="antibioticFinal"></div>
 </div>
@@ -936,17 +945,17 @@ function render() {
 
   if (courseComplete) {
     antibioticBtn.disabled = true;
-    antibioticBtn.textContent = 'Course Complete';
+    antibioticBtn.innerHTML = '<span class="btn-orange-label">Course Complete</span>';
     antibioticStatus.textContent = 'Done';
     antibioticStatus.className = 'status status-ok';
   } else if (abStatus.canLog) {
     antibioticBtn.disabled = false;
-    antibioticBtn.textContent = `Log ${data.settings.doseSize} mL (${abStatus.windowMsg.toLowerCase()})`;
+    antibioticBtn.innerHTML = `<span class="btn-orange-label">Log ${data.settings.doseSize} mL (${abStatus.windowMsg.toLowerCase()})</span>`;
     antibioticStatus.textContent = abStatus.windowMsg;
     antibioticStatus.className = 'status status-due';
   } else {
     antibioticBtn.disabled = true;
-    antibioticBtn.textContent = abStatus.windowMsg;
+    antibioticBtn.innerHTML = `<span class="btn-orange-label">${abStatus.windowMsg}</span>`;
     antibioticStatus.textContent = abStatus.morningDone && abStatus.eveningDone ? 'Done today' : 'Waiting';
     antibioticStatus.className = 'status ' + (abStatus.morningDone && abStatus.eveningDone ? 'status-ok' : 'status-wait');
   }
