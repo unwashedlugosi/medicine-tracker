@@ -482,6 +482,7 @@
   <div id="discardWarning" style="display:none;font-size:12px;color:var(--red);text-align:center;margin-bottom:8px"></div>
   <button class="log-btn btn-orange" id="antibioticBtn" onclick="logAntibiotic()">Log 10 mL Dose</button>
   <div class="last-dose" id="antibioticLast"></div>
+  <div class="last-dose" id="antibioticFinal"></div>
 </div>
 
 <!-- Fever Card -->
@@ -834,6 +835,19 @@ function render() {
     document.getElementById('antibioticLast').textContent = `Last dose: ${dayName}, ${monthDay} (${window})`;
   } else {
     document.getElementById('antibioticLast').textContent = '';
+  }
+
+  // Final dose date
+  if (remainingMl > 0) {
+    const startDate = new Date(getAbStartDate(data) + 'T12:00:00');
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + totalDays - 1);
+    const endDayName = endDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const endMonthDay = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    // Last day has only a morning dose (odd dose out)
+    document.getElementById('antibioticFinal').textContent = `Final dose: ${endDayName}, ${endMonthDay} (morning)`;
+  } else {
+    document.getElementById('antibioticFinal').textContent = '';
   }
 
   // History
