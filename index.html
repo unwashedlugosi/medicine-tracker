@@ -564,12 +564,86 @@
 <script>
 const FOUR_HOURS = 4 * 60 * 60 * 1000;
 const STORAGE_KEY = 'maxMeds';
+const SUPABASE_URL = 'https://dhwllgdxpeucldtmzhme.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRod2xsZ2R4cGV1Y2xkdG16aG1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMzI2NTMsImV4cCI6MjA4NTgwODY1M30.PmDxpoWXP0zA2sJLgRxAfODH1JcjdFOoRMdnGZwJYLE';
 
-function loadData() {
+function sbFetch(path, opts = {}) {
+  return fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    ...opts,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': opts.prefer || 'return=representation',
+      ...opts.headers
+    }
+  });
+}
+
+async function syncFromCloud() {
+  try {
+    const [logsRes, settingsRes] = await Promise.all([
+      sbFetch('medicine_logs?order=timestamp.asc'),
+      sbFetch('medicine_settings?id=eq.1')
+    ]);
+    const logs = await logsRes.json();
+    const settings = await settingsRes.json();
+
+    const data = {
+      logs: logs.map(l => ({ id: l.id, type: l.type, timestamp: l.timestamp, date: l.date, ...(l.value != null ? { value: l.value } : {}) })),
+      settings: settings.length ? {
+        totalMl: settings[0].total_ml,
+        doseSize: settings[0].dose_size,
+        discardDate: settings[0].discard_date
+      } : { totalMl: 200, doseSize: 10, discardDate: '2026-03-20' }
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return data;
+  } catch (e) {
+    console.warn('Cloud sync failed, using local', e);
+    return loadDataLocal();
+  }
+}
+
+async function syncLogToCloud(log) {
+  try {
+    const res = await sbFetch('medicine_logs', {
+      method: 'POST',
+      body: JSON.stringify({ type: log.type, timestamp: log.timestamp, date: log.date, value: log.value || null })
+    });
+    const rows = await res.json();
+    if (rows && rows[0]) return rows[0].id;
+  } catch (e) { console.warn('Failed to sync log', e); }
+}
+
+async function deleteLogFromCloud(id) {
+  if (!id) return;
+  try { await sbFetch('medicine_logs?id=eq.' + id, { method: 'DELETE' }); } catch (e) { console.warn('Failed to delete from cloud', e); }
+}
+
+async function updateLogInCloud(log) {
+  if (!log.id) return;
+  try {
+    await sbFetch('medicine_logs?id=eq.' + log.id, {
+      method: 'PATCH',
+      body: JSON.stringify({ timestamp: log.timestamp, date: log.date, value: log.value || null })
+    });
+  } catch (e) { console.warn('Failed to update cloud', e); }
+}
+
+async function syncSettingsToCloud(settings) {
+  try {
+    await sbFetch('medicine_settings?id=eq.1', {
+      method: 'PATCH',
+      body: JSON.stringify({ total_ml: settings.totalMl, dose_size: settings.doseSize, discard_date: settings.discardDate, updated_at: new Date().toISOString() })
+    });
+  } catch (e) { console.warn('Failed to sync settings', e); }
+}
+
+function loadDataLocal() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
     const data = JSON.parse(raw);
-    // Migrate old format
     if (!data.settings.totalMl) {
       data.settings.totalMl = 200;
       data.settings.doseSize = 10;
@@ -577,26 +651,24 @@ function loadData() {
     }
     return data;
   }
-  return {
-    logs: [],
-    settings: {
-      totalMl: 200,
-      doseSize: 10,
-      discardDate: '2026-03-20'
-    }
-  };
+  return { logs: [], settings: { totalMl: 200, doseSize: 10, discardDate: '2026-03-20' } };
+}
+
+function loadData() {
+  return loadDataLocal();
 }
 
 function saveData(data) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-function saveSettings() {
+async function saveSettings() {
   const data = loadData();
   data.settings.totalMl = parseInt(document.getElementById('totalMl').value) || 200;
   data.settings.doseSize = parseInt(document.getElementById('doseSize').value) || 10;
   saveData(data);
   render();
+  await syncSettingsToCloud(data.settings);
 }
 
 function todayStr() {
@@ -612,16 +684,19 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-function logTylenol() {
+async function logTylenol() {
   const data = loadData();
   const lastTylenol = getLastTylenol(data);
   if (lastTylenol) {
     const elapsed = Date.now() - new Date(lastTylenol.timestamp).getTime();
     if (elapsed < FOUR_HOURS) return;
   }
-  data.logs.push({ type: 'tylenol', timestamp: new Date().toISOString(), date: todayStr() });
+  const log = { type: 'tylenol', timestamp: new Date().toISOString(), date: todayStr() };
+  data.logs.push(log);
   saveData(data);
   render();
+  const id = await syncLogToCloud(log);
+  if (id) { log.id = id; saveData(data); }
 }
 
 // Antibiotic windows: morning (before noon), evening (7pm+)
@@ -676,26 +751,32 @@ function getAbTotalDays(data) {
   return Math.ceil((totalDoses - 1) / 2) + 1;
 }
 
-function logAntibiotic() {
+async function logAntibiotic() {
   const data = loadData();
   const usedMl = data.logs.filter(l => l.type === 'antibiotic').length * data.settings.doseSize;
   if (usedMl >= data.settings.totalMl) return;
   const { canLog } = getAbWindowStatus(data);
   if (!canLog) return;
-  data.logs.push({ type: 'antibiotic', timestamp: new Date().toISOString(), date: todayStr() });
+  const log = { type: 'antibiotic', timestamp: new Date().toISOString(), date: todayStr() };
+  data.logs.push(log);
   saveData(data);
   render();
+  const id = await syncLogToCloud(log);
+  if (id) { log.id = id; saveData(data); }
 }
 
-function logTemp() {
+async function logTemp() {
   const input = document.getElementById('tempInput');
   const val = parseFloat(input.value);
   if (!val || val < 95 || val > 108) return;
   const data = loadData();
-  data.logs.push({ type: 'temp', timestamp: new Date().toISOString(), date: todayStr(), value: val });
+  const log = { type: 'temp', timestamp: new Date().toISOString(), date: todayStr(), value: val };
+  data.logs.push(log);
   saveData(data);
   input.value = '';
   render();
+  const id = await syncLogToCloud(log);
+  if (id) { log.id = id; saveData(data); }
 }
 
 function getLastTylenol(data) {
@@ -920,12 +1001,15 @@ function renderHistory(data) {
   container.innerHTML = html;
 }
 
-function deleteLog(index) {
+async function deleteLog(index) {
   if (!confirm('Remove this entry?')) return;
   const data = loadData();
+  const log = data.logs[index];
+  const cloudId = log ? log.id : null;
   data.logs.splice(index, 1);
   saveData(data);
   render();
+  await deleteLogFromCloud(cloudId);
 }
 
 let editingIndex = null;
@@ -968,7 +1052,7 @@ function closeModal() {
   editingIndex = null;
 }
 
-function saveEdit() {
+async function saveEdit() {
   if (editingIndex === null) return;
   const data = loadData();
   const log = data.logs[editingIndex];
@@ -992,6 +1076,7 @@ function saveEdit() {
   saveData(data);
   closeModal();
   render();
+  await updateLogInCloud(log);
 }
 
 function shareLog() {
@@ -1071,7 +1156,9 @@ function handleHash() {
 
 window.addEventListener('hashchange', handleHash);
 handleHash();
-render();
+// Load from cloud first, then render
+syncFromCloud().then(() => render());
+render(); // render immediately with local data while cloud loads
 </script>
 
 </body>
