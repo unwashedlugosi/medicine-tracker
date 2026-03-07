@@ -29,13 +29,21 @@
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
-    background: url('wallpaper.png') repeat fixed;
-    background-size: 300px;
+    background: transparent;
     color: var(--text);
     min-height: 100dvh;
     padding: env(safe-area-inset-top) 16px 100px 16px;
     max-width: 500px;
     margin: 0 auto;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: url('wallpaper.png') repeat;
+    background-size: 300px;
+    z-index: -1;
   }
 
   h1 {
