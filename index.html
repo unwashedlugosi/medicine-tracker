@@ -106,8 +106,8 @@
   }
 
   .status-wait {
-    background: var(--orange-light);
-    color: var(--orange);
+    background: var(--blue-light);
+    color: var(--blue);
   }
 
   .status-due {
@@ -138,14 +138,24 @@
   }
 
   .btn-blue { background: var(--blue); }
-  .btn-orange { background: var(--orange); }
+  .btn-orange {
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--blue),
+      var(--blue) 4px,
+      white 4px,
+      white 8px
+    );
+    color: var(--blue);
+    text-shadow: 0 0 4px white, 0 0 8px white;
+  }
 
   .timer {
     text-align: center;
     font-size: 24px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: var(--orange);
+    color: var(--blue);
     margin: 8px 0;
   }
 
@@ -190,19 +200,12 @@
     padding: 12px 20px;
     border: none;
     border-radius: 10px;
-    background: repeating-linear-gradient(
-      -45deg,
-      var(--blue),
-      var(--blue) 4px,
-      white 4px,
-      white 8px
-    );
-    color: var(--blue);
+    background: var(--blue);
+    color: white;
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
-    text-shadow: 0 0 4px white, 0 0 8px white;
   }
 
   .history-section {
@@ -255,7 +258,7 @@
   }
 
   .history-icon.tylenol { background: var(--blue-light); }
-  .history-icon.antibiotic { background: var(--orange-light); }
+  .history-icon.antibiotic { background: var(--blue-light); }
   .history-icon.fever { background: var(--red-light); }
 
   .history-details {
@@ -287,7 +290,7 @@
 
   .progress-fill {
     height: 100%;
-    background: var(--orange);
+    background: var(--blue);
     border-radius: 3px;
     transition: width 0.3s;
   }
