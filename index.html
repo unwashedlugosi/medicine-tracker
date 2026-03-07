@@ -465,7 +465,7 @@
     <div class="card-title"><span class="icon">🧪</span> Amoxicillin</div>
     <span class="status" id="antibioticStatus">Ready</span>
   </div>
-  <div style="font-size:13px;color:var(--text2);margin-bottom:8px">10 mL twice daily with meals</div>
+  <div style="font-size:13px;color:var(--text2);margin-bottom:8px">10 mL with meals — morning (before noon) &amp; evening (after 7 PM)</div>
   <div class="antibiotic-progress">
     <div class="progress-bar">
       <div class="progress-fill" id="antibioticProgress"></div>
@@ -609,14 +609,50 @@ function logTylenol() {
   render();
 }
 
+// Antibiotic windows: morning (before noon), evening (7pm+)
+function getAbWindowStatus(data) {
+  const now = new Date();
+  const hour = now.getHours();
+  const today = todayStr();
+  const todayAbLogs = data.logs.filter(l => l.type === 'antibiotic' && l.date === today);
+
+  const morningDone = todayAbLogs.some(l => new Date(l.timestamp).getHours() < 12);
+  const eveningDone = todayAbLogs.some(l => new Date(l.timestamp).getHours() >= 19);
+
+  const inMorningWindow = hour < 12;
+  const inEveningWindow = hour >= 19;
+
+  let canLog = false;
+  let windowMsg = '';
+
+  if (inMorningWindow && !morningDone) {
+    canLog = true;
+    windowMsg = 'Morning dose';
+  } else if (inEveningWindow && !eveningDone) {
+    canLog = true;
+    windowMsg = 'Evening dose';
+  } else if (!morningDone && !inMorningWindow && hour < 19) {
+    windowMsg = 'Next dose at 7 PM';
+  } else if (!eveningDone && !inEveningWindow && hour >= 12) {
+    windowMsg = 'Next dose at 7 PM';
+  } else if (morningDone && eveningDone) {
+    windowMsg = 'Both doses taken';
+  } else {
+    windowMsg = 'Next dose tomorrow morning';
+  }
+
+  const maxToday = morningDone && eveningDone ? 2 : morningDone || eveningDone ? 1 : 0;
+
+  return { canLog, windowMsg, morningDone, eveningDone, todayCount: todayAbLogs.length, maxToday };
+}
+
 function logAntibiotic() {
   const data = loadData();
-  const today = todayStr();
-  const todayDoses = data.logs.filter(l => l.type === 'antibiotic' && l.date === today).length;
-  if (todayDoses >= 2) return;
   const usedMl = data.logs.filter(l => l.type === 'antibiotic').length * data.settings.doseSize;
   if (usedMl >= data.settings.totalMl) return;
-  data.logs.push({ type: 'antibiotic', timestamp: new Date().toISOString(), date: today });
+  const { canLog } = getAbWindowStatus(data);
+  if (!canLog) return;
+  data.logs.push({ type: 'antibiotic', timestamp: new Date().toISOString(), date: todayStr() });
   saveData(data);
   render();
 }
@@ -661,6 +697,8 @@ function render() {
   const tylenolToday = todayLogs.filter(l => l.type === 'tylenol').length;
   const antibioticToday = todayLogs.filter(l => l.type === 'antibiotic').length;
   const todayTemps = todayLogs.filter(l => l.type === 'temp');
+
+  const abStatus = getAbWindowStatus(data);
 
   document.getElementById('tylenolCount').textContent = tylenolToday;
   document.getElementById('antibioticCount').textContent = `${antibioticToday}/2`;
@@ -719,11 +757,13 @@ function render() {
   document.getElementById('antibioticVolLabel').textContent = `${usedMl} mL used`;
   document.getElementById('antibioticVolLeft').textContent = remainingMl > 0 ? `${remainingMl} mL left` : '';
 
-  // Day tracking
-  const dosesPerDay = 2;
-  const dosesLeft = Math.max(0, Math.ceil(remainingMl / data.settings.doseSize));
-  const daysLeft = Math.ceil(dosesLeft / dosesPerDay);
-  const totalDays = Math.ceil((totalMl / data.settings.doseSize) / dosesPerDay);
+  // Day tracking — first day had 1 dose, rest have 2
+  const totalDoses = totalMl / data.settings.doseSize;
+  const totalDays = Math.ceil((totalDoses - 1) / 2) + 1; // 1 dose day 1, then 2/day
+  const dosesTaken = data.logs.filter(l => l.type === 'antibiotic').length;
+  const dosesLeft = totalDoses - dosesTaken;
+  // After first dose, remaining doses come in pairs
+  const daysLeft = dosesTaken === 0 ? totalDays : Math.ceil(dosesLeft / 2);
   const currentDay = totalDays - daysLeft + 1;
   if (remainingMl > 0) {
     document.getElementById('antibioticDayLabel').textContent = `Day ${currentDay} of ${totalDays}`;
@@ -750,24 +790,22 @@ function render() {
   const antibioticBtn = document.getElementById('antibioticBtn');
   const antibioticStatus = document.getElementById('antibioticStatus');
   const courseComplete = remainingMl <= 0;
-  const abDoneToday = antibioticToday >= 2;
 
   if (courseComplete) {
     antibioticBtn.disabled = true;
     antibioticBtn.textContent = 'Course Complete';
     antibioticStatus.textContent = 'Done';
     antibioticStatus.className = 'status status-ok';
-  } else if (abDoneToday) {
-    antibioticBtn.disabled = true;
-    antibioticBtn.textContent = 'Both doses taken today';
-    antibioticStatus.textContent = 'Done today';
-    antibioticStatus.className = 'status status-ok';
-  } else {
+  } else if (abStatus.canLog) {
     antibioticBtn.disabled = false;
-    antibioticBtn.textContent = `Log ${data.settings.doseSize} mL Dose`;
-    const left = 2 - antibioticToday;
-    antibioticStatus.textContent = `${left} left today`;
+    antibioticBtn.textContent = `Log ${data.settings.doseSize} mL (${abStatus.windowMsg.toLowerCase()})`;
+    antibioticStatus.textContent = abStatus.windowMsg;
     antibioticStatus.className = 'status status-due';
+  } else {
+    antibioticBtn.disabled = true;
+    antibioticBtn.textContent = abStatus.windowMsg;
+    antibioticStatus.textContent = abStatus.morningDone && abStatus.eveningDone ? 'Done today' : 'Waiting';
+    antibioticStatus.className = 'status ' + (abStatus.morningDone && abStatus.eveningDone ? 'status-ok' : 'status-wait');
   }
 
   const lastAb = data.logs.filter(l => l.type === 'antibiotic').slice(-1)[0];
