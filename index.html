@@ -815,7 +815,15 @@ function render() {
   }
 
   const lastAb = data.logs.filter(l => l.type === 'antibiotic').slice(-1)[0];
-  document.getElementById('antibioticLast').textContent = lastAb ? 'Last dose: ' + formatTime(lastAb.timestamp) : '';
+  if (lastAb) {
+    const lastAbDt = new Date(lastAb.timestamp);
+    const dayName = lastAbDt.toLocaleDateString('en-US', { weekday: 'long' });
+    const monthDay = lastAbDt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const window = lastAbDt.getHours() < 12 ? 'morning' : 'evening';
+    document.getElementById('antibioticLast').textContent = `Last dose: ${dayName}, ${monthDay} (${window})`;
+  } else {
+    document.getElementById('antibioticLast').textContent = '';
+  }
 
   // History
   renderHistory(data);
