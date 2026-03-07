@@ -625,25 +625,40 @@ function getAbWindowStatus(data) {
   let canLog = false;
   let windowMsg = '';
 
-  if (inMorningWindow && !morningDone) {
+  if (morningDone && eveningDone) {
+    windowMsg = 'Both doses taken';
+  } else if (inMorningWindow && !morningDone) {
     canLog = true;
     windowMsg = 'Morning dose';
   } else if (inEveningWindow && !eveningDone) {
     canLog = true;
     windowMsg = 'Evening dose';
-  } else if (!morningDone && !inMorningWindow && hour < 19) {
+  } else if (!eveningDone) {
     windowMsg = 'Next dose at 7 PM';
-  } else if (!eveningDone && !inEveningWindow && hour >= 12) {
-    windowMsg = 'Next dose at 7 PM';
-  } else if (morningDone && eveningDone) {
-    windowMsg = 'Both doses taken';
   } else {
     windowMsg = 'Next dose tomorrow morning';
   }
 
-  const maxToday = morningDone && eveningDone ? 2 : morningDone || eveningDone ? 1 : 0;
+  return { canLog, windowMsg, morningDone, eveningDone, todayCount: todayAbLogs.length };
+}
 
-  return { canLog, windowMsg, morningDone, eveningDone, todayCount: todayAbLogs.length, maxToday };
+// Get the start date of the antibiotic course (date of first dose, or today)
+function getAbStartDate(data) {
+  const firstAb = data.logs.find(l => l.type === 'antibiotic');
+  return firstAb ? firstAb.date : todayStr();
+}
+
+// Calendar day number (1-based)
+function getAbCurrentDay(data) {
+  const start = new Date(getAbStartDate(data) + 'T12:00:00');
+  const now = new Date(todayStr() + 'T12:00:00');
+  return Math.floor((now - start) / (24 * 60 * 60 * 1000)) + 1;
+}
+
+// Total days in course: day 1 = 1 dose, rest = 2 doses/day
+function getAbTotalDays(data) {
+  const totalDoses = data.settings.totalMl / data.settings.doseSize;
+  return Math.ceil((totalDoses - 1) / 2) + 1;
 }
 
 function logAntibiotic() {
@@ -763,17 +778,13 @@ function render() {
   document.getElementById('antibioticVolLabel').textContent = `${usedMl} mL used`;
   document.getElementById('antibioticVolLeft').textContent = remainingMl > 0 ? `${remainingMl} mL left` : '';
 
-  // Day tracking — first day had 1 dose, rest have 2
-  const totalDoses = totalMl / data.settings.doseSize;
-  const totalDays = Math.ceil((totalDoses - 1) / 2) + 1; // 1 dose day 1, then 2/day
-  const dosesTaken = data.logs.filter(l => l.type === 'antibiotic').length;
-  const dosesLeft = totalDoses - dosesTaken;
-  // After first dose, remaining doses come in pairs
-  const daysLeft = dosesTaken === 0 ? totalDays : Math.ceil(dosesLeft / 2);
-  const currentDay = totalDays - daysLeft + 1;
+  // Day tracking — calendar-based
+  const currentDay = getAbCurrentDay(data);
+  const totalDays = getAbTotalDays(data);
+  const daysLeft = Math.max(0, totalDays - currentDay);
   if (remainingMl > 0) {
     document.getElementById('antibioticDayLabel').textContent = `Day ${currentDay} of ${totalDays}`;
-    document.getElementById('antibioticDaysLeft').textContent = daysLeft <= 1 ? 'Last day' : `${daysLeft} days left`;
+    document.getElementById('antibioticDaysLeft').textContent = daysLeft === 0 ? 'Last day' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
   } else {
     document.getElementById('antibioticDayLabel').textContent = 'Complete!';
     document.getElementById('antibioticDaysLeft').textContent = '';
