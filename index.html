@@ -432,7 +432,7 @@
     </div>
     <div class="summary-item">
       <div class="summary-value" id="antibioticCount">0/2</div>
-      <div class="summary-label">Antibiotic today</div>
+      <div class="summary-label">Amoxicillin today</div>
     </div>
     <div class="summary-item">
       <div class="summary-value" id="lastTemp">--</div>
@@ -462,19 +462,21 @@
 <!-- Antibiotic Card -->
 <div class="card" id="antibioticCard">
   <div class="card-header">
-    <div class="card-title"><span class="icon">🧪</span> Antibiotic</div>
+    <div class="card-title"><span class="icon">🧪</span> Amoxicillin</div>
     <span class="status" id="antibioticStatus">Ready</span>
   </div>
+  <div style="font-size:13px;color:var(--text2);margin-bottom:8px">10 mL twice daily with meals</div>
   <div class="antibiotic-progress">
     <div class="progress-bar">
       <div class="progress-fill" id="antibioticProgress"></div>
     </div>
     <div class="progress-label">
-      <span id="antibioticDayLabel">Day 1</span>
-      <span id="antibioticDaysLeft"></span>
+      <span id="antibioticVolLabel">0 mL used</span>
+      <span id="antibioticVolLeft"></span>
     </div>
   </div>
-  <button class="log-btn btn-orange" id="antibioticBtn" onclick="logAntibiotic()">Log Antibiotic Dose</button>
+  <div id="discardWarning" style="display:none;font-size:12px;color:var(--red);text-align:center;margin-bottom:8px"></div>
+  <button class="log-btn btn-orange" id="antibioticBtn" onclick="logAntibiotic()">Log 10 mL Dose</button>
   <div class="last-dose" id="antibioticLast"></div>
 </div>
 
@@ -489,18 +491,25 @@
   </div>
 </div>
 
+<!-- Share Button -->
+<button class="log-btn btn-blue" onclick="shareLog()" style="margin-bottom:12px">Share Log</button>
+
 <!-- Settings Card -->
 <div class="card">
   <div class="card-header">
     <div class="card-title">⚙️ Settings</div>
   </div>
   <div class="settings-row">
-    <span>Antibiotic course (days)</span>
-    <input type="number" id="courseDays" value="10" min="1" max="30" inputmode="numeric" onchange="saveSettings()">
+    <span>Total mL prescribed</span>
+    <input type="number" id="totalMl" value="200" min="50" max="1000" step="10" inputmode="numeric" onchange="saveSettings()">
   </div>
   <div class="settings-row">
-    <span>Antibiotic start date</span>
-    <span id="startDateDisplay"></span>
+    <span>mL per dose</span>
+    <input type="number" id="doseSize" value="10" min="1" max="50" inputmode="numeric" onchange="saveSettings()">
+  </div>
+  <div class="settings-row">
+    <span>Discard after</span>
+    <span id="discardDateDisplay">Mar 20</span>
   </div>
 </div>
 
@@ -539,13 +548,22 @@ const STORAGE_KEY = 'maxMeds';
 
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) return JSON.parse(raw);
+  if (raw) {
+    const data = JSON.parse(raw);
+    // Migrate old format
+    if (!data.settings.totalMl) {
+      data.settings.totalMl = 200;
+      data.settings.doseSize = 10;
+      data.settings.discardDate = '2026-03-20';
+    }
+    return data;
+  }
   return {
     logs: [],
     settings: {
-      courseDays: 10,
-      antibioticStartDate: '2026-03-06',
-      firstDayDoses: 1
+      totalMl: 200,
+      doseSize: 10,
+      discardDate: '2026-03-20'
     }
   };
 }
@@ -556,7 +574,8 @@ function saveData(data) {
 
 function saveSettings() {
   const data = loadData();
-  data.settings.courseDays = parseInt(document.getElementById('courseDays').value) || 10;
+  data.settings.totalMl = parseInt(document.getElementById('totalMl').value) || 200;
+  data.settings.doseSize = parseInt(document.getElementById('doseSize').value) || 10;
   saveData(data);
   render();
 }
@@ -590,8 +609,9 @@ function logAntibiotic() {
   const data = loadData();
   const today = todayStr();
   const todayDoses = data.logs.filter(l => l.type === 'antibiotic' && l.date === today).length;
-  const maxToday = getMaxAntibioticToday(data);
-  if (todayDoses >= maxToday) return;
+  if (todayDoses >= 2) return;
+  const usedMl = data.logs.filter(l => l.type === 'antibiotic').length * data.settings.doseSize;
+  if (usedMl >= data.settings.totalMl) return;
   data.logs.push({ type: 'antibiotic', timestamp: new Date().toISOString(), date: today });
   saveData(data);
   render();
@@ -613,22 +633,8 @@ function getLastTylenol(data) {
   return tylenols.length ? tylenols[tylenols.length - 1] : null;
 }
 
-function getMaxAntibioticToday(data) {
-  const today = todayStr();
-  const startDate = data.settings.antibioticStartDate;
-  if (today === startDate) return data.settings.firstDayDoses;
-  return 2;
-}
-
-function getAntibioticDay(data) {
-  const start = new Date(data.settings.antibioticStartDate + 'T12:00:00');
-  const now = new Date(todayStr() + 'T12:00:00');
-  const diff = Math.floor((now - start) / (24 * 60 * 60 * 1000));
-  return Math.max(1, diff + 1);
-}
-
-function getTotalAntibioticDoses(data) {
-  return data.logs.filter(l => l.type === 'antibiotic').length;
+function getUsedMl(data) {
+  return data.logs.filter(l => l.type === 'antibiotic').length * data.settings.doseSize;
 }
 
 function render() {
@@ -641,18 +647,19 @@ function render() {
   });
 
   // Settings
-  document.getElementById('courseDays').value = data.settings.courseDays;
-  document.getElementById('startDateDisplay').textContent = formatDate(data.settings.antibioticStartDate);
+  document.getElementById('totalMl').value = data.settings.totalMl;
+  document.getElementById('doseSize').value = data.settings.doseSize;
+  const discardDt = new Date(data.settings.discardDate + 'T12:00:00');
+  document.getElementById('discardDateDisplay').textContent = discardDt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   // Today's counts
   const todayLogs = data.logs.filter(l => l.date === today);
   const tylenolToday = todayLogs.filter(l => l.type === 'tylenol').length;
   const antibioticToday = todayLogs.filter(l => l.type === 'antibiotic').length;
-  const maxAbToday = getMaxAntibioticToday(data);
   const todayTemps = todayLogs.filter(l => l.type === 'temp');
 
   document.getElementById('tylenolCount').textContent = tylenolToday;
-  document.getElementById('antibioticCount').textContent = `${antibioticToday}/${maxAbToday}`;
+  document.getElementById('antibioticCount').textContent = `${antibioticToday}/2`;
 
   if (todayTemps.length) {
     const lastT = todayTemps[todayTemps.length - 1].value;
@@ -698,21 +705,34 @@ function render() {
     tylenolStatus.className = 'status status-wait';
   }
 
-  // Antibiotic
-  const abDay = getAntibioticDay(data);
-  const courseDays = data.settings.courseDays;
-  const courseComplete = abDay > courseDays;
-  const totalDoses = getTotalAntibioticDoses(data);
-  const expectedTotal = (data.settings.firstDayDoses) + (courseDays - 1) * 2;
-  const progress = Math.min(100, (totalDoses / expectedTotal) * 100);
+  // Antibiotic (volume-based)
+  const usedMl = getUsedMl(data);
+  const totalMl = data.settings.totalMl;
+  const remainingMl = totalMl - usedMl;
+  const progress = Math.min(100, (usedMl / totalMl) * 100);
 
   document.getElementById('antibioticProgress').style.width = progress + '%';
-  document.getElementById('antibioticDayLabel').textContent = courseComplete ? 'Complete!' : `Day ${abDay} of ${courseDays}`;
-  document.getElementById('antibioticDaysLeft').textContent = courseComplete ? '' : `${courseDays - abDay} days left`;
+  document.getElementById('antibioticVolLabel').textContent = `${usedMl} mL used`;
+  document.getElementById('antibioticVolLeft').textContent = remainingMl > 0 ? `${remainingMl} mL left` : '';
+
+  // Discard warning
+  const discardDate = new Date(data.settings.discardDate + 'T23:59:59');
+  const daysUntilDiscard = Math.ceil((discardDate - new Date()) / (24 * 60 * 60 * 1000));
+  const discardWarning = document.getElementById('discardWarning');
+  if (daysUntilDiscard <= 3 && daysUntilDiscard > 0 && remainingMl > 0) {
+    discardWarning.style.display = 'block';
+    discardWarning.textContent = `Discard in ${daysUntilDiscard} day${daysUntilDiscard === 1 ? '' : 's'}`;
+  } else if (daysUntilDiscard <= 0 && remainingMl > 0) {
+    discardWarning.style.display = 'block';
+    discardWarning.textContent = 'Past discard date!';
+  } else {
+    discardWarning.style.display = 'none';
+  }
 
   const antibioticBtn = document.getElementById('antibioticBtn');
   const antibioticStatus = document.getElementById('antibioticStatus');
-  const abDoneToday = antibioticToday >= maxAbToday;
+  const courseComplete = remainingMl <= 0;
+  const abDoneToday = antibioticToday >= 2;
 
   if (courseComplete) {
     antibioticBtn.disabled = true;
@@ -721,14 +741,14 @@ function render() {
     antibioticStatus.className = 'status status-ok';
   } else if (abDoneToday) {
     antibioticBtn.disabled = true;
-    antibioticBtn.textContent = 'All doses taken today';
+    antibioticBtn.textContent = 'Both doses taken today';
     antibioticStatus.textContent = 'Done today';
     antibioticStatus.className = 'status status-ok';
   } else {
     antibioticBtn.disabled = false;
-    antibioticBtn.textContent = 'Log Antibiotic Dose';
-    const remaining = maxAbToday - antibioticToday;
-    antibioticStatus.textContent = `${remaining} left today`;
+    antibioticBtn.textContent = `Log ${data.settings.doseSize} mL Dose`;
+    const left = 2 - antibioticToday;
+    antibioticStatus.textContent = `${left} left today`;
     antibioticStatus.className = 'status status-due';
   }
 
@@ -770,7 +790,7 @@ function renderHistory(data) {
     logs.forEach((log, i) => {
       const iconClass = log.type === 'temp' ? 'fever' : log.type;
       const icon = log.type === 'tylenol' ? '💊' : log.type === 'antibiotic' ? '🧪' : '🌡️';
-      const name = log.type === 'tylenol' ? 'Tylenol' : log.type === 'antibiotic' ? 'Antibiotic' : 'Temperature';
+      const name = log.type === 'tylenol' ? 'Tylenol' : log.type === 'antibiotic' ? 'Amoxicillin' : 'Temperature';
       const extra = log.type === 'temp'
         ? `<span class="history-temp ${log.value >= 100.4 ? 'temp-high' : 'temp-normal'}">${log.value.toFixed(1)}°</span>`
         : '';
@@ -808,8 +828,8 @@ function openEdit(index) {
   editingIndex = index;
 
   const dt = new Date(log.timestamp);
-  const name = log.type === 'tylenol' ? 'Tylenol' : log.type === 'antibiotic' ? 'Antibiotic' : 'Temperature';
-  document.getElementById('editTitle').textContent = 'Edit ' + name;
+  const editName = log.type === 'tylenol' ? 'Tylenol' : log.type === 'antibiotic' ? 'Amoxicillin' : 'Temperature';
+  document.getElementById('editTitle').textContent = 'Edit ' + editName;
 
   // Set date (YYYY-MM-DD)
   const y = dt.getFullYear();
@@ -863,6 +883,49 @@ function saveEdit() {
   saveData(data);
   closeModal();
   render();
+}
+
+function shareLog() {
+  const data = loadData();
+  if (!data.logs.length) { alert('No entries to share yet.'); return; }
+
+  let text = "Max's Medicine Log\n";
+  text += "==================\n\n";
+
+  // Summary
+  const usedMl = getUsedMl(data);
+  text += `Amoxicillin: ${usedMl} of ${data.settings.totalMl} mL used (${data.settings.doseSize} mL/dose)\n`;
+  const totalTylenol = data.logs.filter(l => l.type === 'tylenol').length;
+  text += `Tylenol doses: ${totalTylenol}\n\n`;
+
+  // Group by date
+  const byDate = {};
+  data.logs.forEach(log => {
+    if (!byDate[log.date]) byDate[log.date] = [];
+    byDate[log.date].push(log);
+  });
+
+  const sortedDates = Object.keys(byDate).sort().reverse();
+  sortedDates.forEach(date => {
+    text += formatDate(date) + '\n';
+    byDate[date].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(log => {
+      const time = formatTime(log.timestamp);
+      if (log.type === 'tylenol') {
+        text += `  ${time} - Tylenol\n`;
+      } else if (log.type === 'antibiotic') {
+        text += `  ${time} - Amoxicillin ${data.settings.doseSize} mL\n`;
+      } else {
+        text += `  ${time} - Temp: ${log.value.toFixed(1)}°F\n`;
+      }
+    });
+    text += '\n';
+  });
+
+  if (navigator.share) {
+    navigator.share({ title: "Max's Medicine Log", text: text }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(text).then(() => alert('Log copied to clipboard'));
+  }
 }
 
 // Tick the countdown every second
